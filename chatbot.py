@@ -63,74 +63,74 @@ all_slots = {
     'account':None,
     'pin':None,
     'amount_of_money':None,
-    'yesno':False,
-    'cursor':1,    
+    'yesno':None,
+    'cursor':0,
+    'balance':1000000     
 }
 
 slot_map_for_ban = {
     'account':'একাউন্ট নাম্বার',
     'pin':'পিন নাম্বার',
     'amount_of_money':'টাকার পরিমান',
-    'yesno':'হ্যাঁ বা না'   
+    'yesno':'হ্যাঁ বা না',
+    'balance':'ব্যালেন্স',   
 }
 
 STORIES = {                          ##utter                      action
     # 'check_balance': {'0':'utter_ask_account','1':{'inform':[{'account':76534721}]},'2':'utter_tell_account','3':{''},'3':'utter_ask_pin','3':{'inform':[{'pin':3276}]},'4':'utter_tell_balance'},
     'check_balance': {'0':{'name':'utter_ask_account'},
         '1':{'name':'action_get_account','expected_intents':['inform'],'req_slots':['account']},
-        '2':{'name':'utter_tell_account'},
-        '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'1'},
+        '2':{'name':'utter_confirm_account'},
+        '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'0'},
         '4':{'name':'utter_ask_pin'},
         '5':{'name':'action_get_pin','expected_intents':['inform'],'req_slots':['pin']},
-        '6':{'name':'utter_tell_pin'},
-        '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'5'},
+        '6':{'name':'utter_confirm_pin'},
+        '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'4'},
         '8':{'name':'utter_tell_balance','end_story':True}}
 }
 
 
-def get_slots(slot_name,user_input):
+def set_slots(slot_name,user_input,user_intent):
     # global all_slots
     # all_slots = nlu_engine.parse(user_input)
-
     ###TODO process user input and extract slots
-    if user_input=="হ্যাঁ":
+    if user_intent=="affirm":
         all_slots['yesno']=True
-    elif user_input=="না":
+    elif user_intent=="deny":
         all_slots['yesno']=False
     else:
-        all_slots[slot_name] =  int(user_input)
+        all_slots[slot_name] = int(user_input)
 
 
 
 def utters_responses(to_do=None,slot=None):
     if(to_do=='ask'):
         print("দয়া করে "+slot_map_for_ban[slot]+" দিন")
-    elif(to_do=='tell'):
+    elif(to_do=='confirm'):
         print("আপনার "+slot_map_for_ban[slot]+" হল "+str(all_slots[slot]))
         print("এটা কি সঠিক হয়েছে?")
+    elif(to_do=='tell'):
+        print("আপনার "+slot_map_for_ban[slot]+" হল "+str(all_slots[slot]))
     else:
         print(" আমি ঠিক বুঝতে পারিনি। দয়া করে আবার বলুন")
 
 
 def utter_process(utter_name):
     all_slots['cursor']+=1
-    utter_parts=utter_name.spilt('_')
+    utter_parts=utter_name.split('_')
     if(utter_parts[0]=='utter'):
         utters_responses(to_do=utter_parts[1],slot=utter_parts[2])
     else:
         utters_responses()
 
 
-
-
-
-def action_process(full_action,user_response):
+def action_process(full_action,user_response,user_intent):
     all_slots['cursor']+=1
     action_parts = full_action['name'].split('_')
     req_slots = full_action['req_slots']
     expected_intents = full_action['expected_intents']
     ### (*) is similer to spread (...) operation in javascript
-    get_slots(*req_slots,user_response)
+    set_slots(*req_slots,user_response,user_intent)
     if 'prev_step' in full_action:
         if all_slots['yesno']==True:
             full_action['prev_step']==None
@@ -140,10 +140,6 @@ def action_process(full_action,user_response):
         
 
 
-
-
-
-
 def greeting(sentence):
     """If user's input is a greeting, return a greeting response"""
     for word in sentence.split():
@@ -151,10 +147,10 @@ def greeting(sentence):
             return random.choice(GREETING_RESPONSES)
 
 
-# Generating response
+# Generating respons
 def response(user_response):
     parsing=nlu_engine.parse(user_response)
-    print(parsing)
+    # print(parsing)
     probability=parsing['intent']['probability']
 
     # robo_response=''
@@ -175,37 +171,48 @@ def response(user_response):
         return robo_response
 
 
+def take_input():
+
+    user_response = input("->")
+    user_response=user_response.lower()
+    user_intent = response(user_response)
+    return user_response,user_intent
+
 flag=True
 print("ROBO: My name is Robo. I will answer your queries about Chatbots. If you want to exit, type Bye!")
 while(flag==True):
-    user_response = input()
-    user_response=user_response.lower()
-    user_intent = response(user_response)
-
+    user_response , user_intent = take_input()
 
     if(user_response!='bye'):
         if(user_response=='thanks' or user_response=='thank you' ):
             flag=False
             print("ROBO: You are welcome..")
-        if (user_intent=='check balance'):
+        if (user_intent=='check_balance'):
             story_intents = []
             slots = []
             this_story = STORIES['check_balance']
             # for key, value in STORIES.items():
             i = 0
+            skip = True
             while True:
-                i = int(all_slots['cursor'])
-                value = this_story[str(i)]
-                if 'end_story' in value:
-                    break
+                # all_slots['cursor'] = i
+                if not skip:
+                    user_response , story_intent = take_input()
+                value = this_story[str(all_slots['cursor'])]
+                # print(value)
                 if value['name'].split('_')[0] == 'utter':
                     utter_process(value['name'])
-                if 'expected_intents' in value and user_intent in value['expected_intents']:
-                    if value['name'].split('_')[0] == 'action':
-                        action_process(value, user_response)
-
-
-
+                    skip = False
+                # if 'expected_intents' in value and user_intent in value['expected_intents']:
+                # if value['name'].split('_')[0] == 'action':
+                else:
+                    print("user_response")
+                    skip = True
+                    action_process(value, user_response, story_intent)
+                # print(all_slots['cursor'])
+                if 'end_story' in value:
+                    all_slots['cursor'] = 0
+                    break
         else:
             if(greeting(user_response)!=None):
                 print("ROBO: "+greeting(user_response))

@@ -17,4 +17,3 @@ with open('domain.yml', encoding="utf8") as f:
         dictionary ={}
         dictionary ={key:value[0]['text']}
         utters.append(dictionary)
-    print(utters)
