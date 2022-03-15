@@ -6,12 +6,13 @@ from __future__ import unicode_literals, print_function
 import io
 import random
 import string
+from time import time
 import numpy as np
 import json
 import nltk
 import pandas as pd
 import warnings
-
+import time
 #for snips
 
 from venv import create # to process standard python strings
@@ -62,33 +63,55 @@ log = None
 all_slots = {
     'account':None,
     'pin':None,
-    'amount_of_money':None,
+    'amountOfMoney':None,
     'yesno':None,
-    'card_number':None,
+    'cardNumber':None,
     'cursor':0,
-    'balance':1000000     
+    'balance':1000000,
+    'success':True,
+    'phoneNumber':None,     
 }
 
 slot_map_for_ban = {
     'account':'একাউন্ট নাম্বার',
     'pin':'পিন নাম্বার',
-    'amount_of_money':'টাকার পরিমান',
+    'amountOfMoney':'টাকার পরিমান',
     'yesno':'হ্যাঁ বা না',
     'balance':'ব্যালেন্স',
-    'card_number':'কার্ড নাম্বার'   
+    'cardNumber':'কার্ড নাম্বার',
+    'success':'সফল',
+    'phoneNumber':'ফোন নাম্বার'   
 }
 
 STORIES = {                          ##utter                      action
     # 'check_balance': {'0':'utter_ask_account','1':{'inform':[{'account':76534721}]},'2':'utter_tell_account','3':{''},'3':'utter_ask_pin','3':{'inform':[{'pin':3276}]},'4':'utter_tell_balance'},
-    'check_balance': {'0':{'name':'utter_ask_account','will_skip':False}, 
+    'check_balance': {'0':{'name':'utter_ask_account'}, 
         '1':{'name':'action_get_account','expected_intents':['inform'],'req_slots':['account']},
         '2':{'name':'utter_confirm_account'},
         '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'0'},
-        '4':{'name':'utter_ask_pin','will_skip':False},
+        '4':{'name':'utter_ask_pin'},
         '5':{'name':'action_get_pin','expected_intents':['inform'],'req_slots':['pin']},
         '6':{'name':'utter_confirm_pin'},
         '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'4'},
-        '8':{'name':'utter_tell_balance','end_story':True}}
+        '8':{'name':'utter_tell_wait'},
+        '9':{'name':'utter_tell_balance','end_story':True}},
+
+    'bKash_transfer':{'0':{'name':'utter_ask_account'}, 
+        '1':{'name':'action_get_account','expected_intents':['inform'],'req_slots':['account']},
+        '2':{'name':'utter_confirm_account'},
+        '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'0'},
+        '4':{'name':'utter_ask_phoneNumber'},
+        '5':{'name':'action_get_phoneNumber','expected_intents':['inform'],'req_slots':['phoneNumber']},
+        '6':{'name':'utter_confirm_phoneNumber'},
+        '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'4'},
+        '8':{'name':'utter_ask_amountOfMoney'},
+        '9':{'name':'action_get_amountOfMoney','expected_intents':['inform'],'req_slots':['amountOfMoney']},
+        '10':{'name':'utter_confirm_amountOfMoney'},
+        '11':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'8'},
+        '12':{'name':'utter_tell_wait'},
+        '13':{'name':'utter_tell_success'},
+        '14':{'name':'utter_tell_balance','end_story':True},
+        }
 }
 
 
@@ -100,33 +123,48 @@ def set_slots(slot_name,user_input,user_intent):
         all_slots['yesno']=True
     elif user_intent=="deny":
         all_slots['yesno']=False
+    elif slot_name=="amountOfMoney":
+        all_slots[slot_name] = int(user_input)
+        if all_slots['balance']- int(user_input)>0:
+            all_slots['balance'] =  all_slots['balance']- int(user_input)
+        else:
+            all_slots['success'] = False
     else:
         all_slots[slot_name] = int(user_input)
 
 
-
-def utters_responses(to_do=None,slot=None):
+def utters_responses(to_do=None,slot_name=None):
     if(to_do=='ask'):
-        if all_slots.get(slot) is not None and all_slots.get('yesno') is True and( slot == 'account' or slot == 'card_number'):
-            print("helloo")
+        if all_slots.get(slot_name) is not None and all_slots.get('yesno') is True and( slot_name == 'account' or slot_name == 'cardNumber'):
             all_slots['cursor']+=1
         else:
-            print("দয়া করে "+slot_map_for_ban[slot]+" দিন")
+            print("দয়া করে "+slot_map_for_ban[slot_name]+" দিন")
     elif(to_do=='confirm'):
-        print("আপনার "+slot_map_for_ban[slot]+" হল "+str(all_slots[slot]))
+        print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
         print("এটা কি সঠিক হয়েছে?")
     elif(to_do=='tell'):
-        print("আপনার "+slot_map_for_ban[slot]+" হল "+str(all_slots[slot]))
+        if slot_name == 'wait':
+            print("অনুগ্রহ করে কিছুক্ষণ সময় দিন")
+            time.sleep(2)
+            
+            ##TODO: transaction in bank api
+
+        elif slot_name == 'success':
+            if all_slots['success'] == True:
+                print("কাজটি সফলভাবে সম্পন্ন হয়েছে")
+            else:
+                print("কাজটি সফলভাবে সম্পন্ন হয়নি")
+        else:        
+            print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
     else:
         print(" আমি ঠিক বুঝতে পারিনি। দয়া করে আবার বলুন")
 
 
-def utter_process(utter_name,skip=False):
-    skip = skip
+def utter_process(utter_name):
     all_slots['cursor']+=1
     utter_parts=utter_name.split('_')
     if(utter_parts[0]=='utter'):
-        utters_responses(to_do=utter_parts[1],slot=utter_parts[2])
+        utters_responses(to_do=utter_parts[1],slot_name=utter_parts[2])
     else:
         utters_responses()
 
@@ -152,7 +190,6 @@ def greeting(sentence):
         if word.lower() in GREETING_INPUTS:
             return random.choice(GREETING_RESPONSES)
 
-
 # Generating respons
 def response(user_response):
     parsing=nlu_engine.parse(user_response)
@@ -177,7 +214,6 @@ def response(user_response):
 
 
 def take_input():
-
     user_response = input("->")
     user_response=user_response.lower()
     user_intent = response(user_response)
@@ -189,35 +225,29 @@ def alt_rasa():
     print("ROBO: My name is Robo. I will answer your queries about Chatbots. If you want to exit, type Bye!")
     while(flag==True):
         user_response , user_intent = take_input()
-
+        # print(all_slots['cursor'])
         if(user_response!='bye'):
             if(user_response=='thanks' or user_response=='thank you' ):
                 flag=False
                 print("ROBO: You are welcome..")
-            if (user_intent=='check_balance'):
+            if user_intent in STORIES:
                 story_intents = []
                 slots = []
-                this_story = STORIES['check_balance']
+                this_story = STORIES[user_intent]
                 # for key, value in STORIES.items():
-                i = 0
-                skip = True
                 while True:
                     # if not skip:
                     value = this_story[str(all_slots['cursor'])]
-
                     if value['name'].split('_')[0] == 'utter':
-                        skip = False
-                        # utter_process(value['name'],skip)
                         utter_process(value['name'])   
                     # if 'expected_intents' in value and user_intent in value['expected_intents']:
                     # if value['name'].split('_')[0] == 'action':
                     else:
-                        skip = True
                         action_process(value)
                     if 'end_story' in value:
                         all_slots['cursor'] = 0
+                        all_slots['success'] = False
                         break
-
             else:
                 if(greeting(user_response)!=None):
                     print("ROBO: "+greeting(user_response))
