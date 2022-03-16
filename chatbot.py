@@ -59,7 +59,9 @@ GREETING_INPUTS = ("hello", "hi", "greetings", "sup", "what's up","hey",)
 GREETING_RESPONSES = ["hi", "hey", "*nods*", "hi there", "hello", "I am glad! You are talking to me"]
 
 
-log = None
+logs = []
+trackers = []
+
 all_slots = {
     'account':None,
     'pin':None,
@@ -69,7 +71,8 @@ all_slots = {
     'cursor':0,
     'balance':1000000,
     'success':True,
-    'phoneNumber':None,     
+    'phoneNumber':None,
+    'isContinue':True,
 }
 
 slot_map_for_ban = {
@@ -86,32 +89,31 @@ slot_map_for_ban = {
 STORIES = {                          ##utter                      action
     # 'check_balance': {'0':'utter_ask_account','1':{'inform':[{'account':76534721}]},'2':'utter_tell_account','3':{''},'3':'utter_ask_pin','3':{'inform':[{'pin':3276}]},'4':'utter_tell_balance'},
     'check_balance': {'0':{'name':'utter_ask_account'}, 
-        '1':{'name':'action_get_account','expected_intents':['inform'],'req_slots':['account']},
+        '1':{'name':'action_get_account','expected_intents':['inform','fallback'],'req_slots':['account']},
         '2':{'name':'utter_confirm_account'},
         '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'0'},
         '4':{'name':'utter_ask_pin'},
-        '5':{'name':'action_get_pin','expected_intents':['inform'],'req_slots':['pin']},
+        '5':{'name':'action_get_pin','expected_intents':['inform','fallback'],'req_slots':['pin']},
         '6':{'name':'utter_confirm_pin'},
         '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'4'},
         '8':{'name':'utter_tell_wait'},
         '9':{'name':'utter_tell_balance','end_story':True}},
 
     'bKash_transfer':{'0':{'name':'utter_ask_account'}, 
-        '1':{'name':'action_get_account','expected_intents':['inform'],'req_slots':['account']},
+        '1':{'name':'action_get_account','expected_intents':['inform','fallback'],'req_slots':['account']},
         '2':{'name':'utter_confirm_account'},
         '3':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'0'},
         '4':{'name':'utter_ask_phoneNumber'},
-        '5':{'name':'action_get_phoneNumber','expected_intents':['inform'],'req_slots':['phoneNumber']},
+        '5':{'name':'action_get_phoneNumber','expected_intents':['inform','fallback'],'req_slots':['phoneNumber']},
         '6':{'name':'utter_confirm_phoneNumber'},
         '7':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'4'},
         '8':{'name':'utter_ask_amountOfMoney'},
-        '9':{'name':'action_get_amountOfMoney','expected_intents':['inform'],'req_slots':['amountOfMoney']},
+        '9':{'name':'action_get_amountOfMoney','expected_intents':['inform','fallback'],'req_slots':['amountOfMoney']},
         '10':{'name':'utter_confirm_amountOfMoney'},
         '11':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'8'},
         '12':{'name':'utter_tell_wait'},
         '13':{'name':'utter_tell_success'},
-        '14':{'name':'utter_tell_balance','end_story':True},
-        }
+        '14':{'name':'utter_tell_balance','end_story':True}}
 }
 
 
@@ -140,8 +142,11 @@ def utters_responses(to_do=None,slot_name=None):
         else:
             print("দয়া করে "+slot_map_for_ban[slot_name]+" দিন")
     elif(to_do=='confirm'):
-        print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
-        print("এটা কি সঠিক হয়েছে?")
+        if slot_name =='isContinue':
+           print("আপনি কি কাজটি সম্পন্ন করতে চান?")
+        else:    
+            print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
+            print("এটা কি সঠিক হয়েছে?")
     elif(to_do=='tell'):
         if slot_name == 'wait':
             print("অনুগ্রহ করে কিছুক্ষণ সময় দিন")
@@ -175,6 +180,28 @@ def action_process(full_action):
     action_parts = full_action['name'].split('_')
     req_slots = full_action['req_slots']
     expected_intents = full_action['expected_intents']
+    print(expected_intents)
+    print('test')
+    print(user_response)
+
+    # if user_intent not in expected_intents:
+    
+
+    
+    if user_intent not in expected_intents:
+        trackers.append(current_story)
+        print(trackers)
+        all_slots['cursor']=0
+        run_story(user_intent)
+
+        # utter_process('utter_confirm_isContinue')
+        # action_process({'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno']})
+        # if all_slots['yesno']==True:
+        #     all_slots['cursor']-=2
+        # else:
+        #     run_story(user_intent)
+        ###TODO: process story transitions
+
 
     ### (*) is similer to spread (...) operation in javascript
     set_slots(*req_slots,user_response,user_intent)
@@ -182,6 +209,7 @@ def action_process(full_action):
         if all_slots['yesno']==False:
             all_slots['cursor']= int(full_action['prev_step'])
     # if(action_parts[0]=='action'):
+    logs.append({'user_response':user_response,'user_intent':user_intent})
 
 
 def greeting(sentence):
@@ -194,7 +222,7 @@ def greeting(sentence):
 def response(user_response):
     parsing=nlu_engine.parse(user_response)
     probability=parsing['intent']['probability']
-
+    print(parsing)
     # robo_response=''
     # sent_tokens.append(user_response)
     # TfidfVec = TfidfVectorizer(tokenizer=LemNormalize, stop_words='english')
@@ -219,7 +247,35 @@ def take_input():
     user_intent = response(user_response)
     return user_response,user_intent
 
-  
+
+
+def run_story(user_intent):
+    this_story = STORIES[user_intent]
+    # for key, value in STORIES.items():
+    current_story['story_name'] = user_intent
+    while True:
+        # if not skip:
+        value = this_story[str(all_slots['cursor'])]
+        current_story['story_steps'] = all_slots['cursor']
+        if value['name'].split('_')[0] == 'utter':
+            utter_process(value['name'])   
+        # if 'expected_intents' in value and user_intent in value['expected_intents']:
+        # if value['name'].split('_')[0] == 'action':
+        else:
+            action_process(value)
+        if 'end_story' in value:
+            if trackers != []:
+                print(trackers)
+                story = trackers.pop()
+                all_slots['cursor']=story['story_steps']
+                run_story(story['story_name'])
+            all_slots['cursor'] = 0
+            all_slots['success'] = False
+            break
+
+
+current_story = {'story_name':None,'story_steps':None}
+
 def alt_rasa():
     flag=True
     print("ROBO: My name is Robo. I will answer your queries about Chatbots. If you want to exit, type Bye!")
@@ -231,23 +287,10 @@ def alt_rasa():
                 flag=False
                 print("ROBO: You are welcome..")
             if user_intent in STORIES:
-                story_intents = []
-                slots = []
-                this_story = STORIES[user_intent]
-                # for key, value in STORIES.items():
-                while True:
-                    # if not skip:
-                    value = this_story[str(all_slots['cursor'])]
-                    if value['name'].split('_')[0] == 'utter':
-                        utter_process(value['name'])   
-                    # if 'expected_intents' in value and user_intent in value['expected_intents']:
-                    # if value['name'].split('_')[0] == 'action':
-                    else:
-                        action_process(value)
-                    if 'end_story' in value:
-                        all_slots['cursor'] = 0
-                        all_slots['success'] = False
-                        break
+                
+                run_story(user_intent)
+                
+                
             else:
                 if(greeting(user_response)!=None):
                     print("ROBO: "+greeting(user_response))
