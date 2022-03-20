@@ -13,6 +13,7 @@ import nltk
 import pandas as pd
 import warnings
 import time
+import copy
 #for snips
 
 from venv import create # to process standard python strings
@@ -143,7 +144,7 @@ def utters_responses(to_do=None,slot_name=None):
             print("দয়া করে "+slot_map_for_ban[slot_name]+" দিন")
     elif(to_do=='confirm'):
         if slot_name =='isContinue':
-           print("আপনি কি কাজটি সম্পন্ন করতে চান?")
+           print("আপনি কি আগের কাজটি সম্পন্ন করতে চান?")
         else:    
             print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
             print("এটা কি সঠিক হয়েছে?")
@@ -180,17 +181,10 @@ def action_process(full_action):
     action_parts = full_action['name'].split('_')
     req_slots = full_action['req_slots']
     expected_intents = full_action['expected_intents']
-    print(expected_intents)
-    print('test')
-    print(user_response)
 
-    # if user_intent not in expected_intents:
-    
-
-    
     if user_intent not in expected_intents:
-        trackers.append(current_story)
-        print(trackers)
+        this_story =copy.copy(current_story)
+        trackers.append(this_story)
         all_slots['cursor']=0
         run_story(user_intent)
 
@@ -222,7 +216,6 @@ def greeting(sentence):
 def response(user_response):
     parsing=nlu_engine.parse(user_response)
     probability=parsing['intent']['probability']
-    print(parsing)
     # robo_response=''
     # sent_tokens.append(user_response)
     # TfidfVec = TfidfVectorizer(tokenizer=LemNormalize, stop_words='english')
@@ -256,22 +249,35 @@ def run_story(user_intent):
     while True:
         # if not skip:
         value = this_story[str(all_slots['cursor'])]
-        current_story['story_steps'] = all_slots['cursor']
+        current_story['story_steps'] = all_slots['cursor']-1
+        if 'end_story' in value:
+            if trackers != []:
+                story = trackers.pop()
+                utter_process('utter_confirm_isContinue')
+                action_process({'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno']})
+                if all_slots['yesno']==True:
+                    all_slots['cursor']=story['story_steps']
+                    # print(all_slots['cursor'])
+                    run_story(story['story_name'])
+            else:
+                # reset slots
+                all_slots['cursor'] = 0
+                all_slots['success'] = False
+                all_slots['yesno'] = False
+                all_slots['phoneNumber'] = None
+                all_slots['amount'] = None
+                all_slots['phoneNumber'] = None
+                break
         if value['name'].split('_')[0] == 'utter':
             utter_process(value['name'])   
         # if 'expected_intents' in value and user_intent in value['expected_intents']:
         # if value['name'].split('_')[0] == 'action':
         else:
             action_process(value)
-        if 'end_story' in value:
-            if trackers != []:
-                print(trackers)
-                story = trackers.pop()
-                all_slots['cursor']=story['story_steps']
-                run_story(story['story_name'])
-            all_slots['cursor'] = 0
-            all_slots['success'] = False
-            break
+
+        
+        
+            
 
 
 current_story = {'story_name':None,'story_steps':None}
@@ -286,11 +292,8 @@ def alt_rasa():
             if(user_response=='thanks' or user_response=='thank you' ):
                 flag=False
                 print("ROBO: You are welcome..")
-            if user_intent in STORIES:
-                
-                run_story(user_intent)
-                
-                
+            if user_intent in STORIES:                
+                run_story(user_intent)             
             else:
                 if(greeting(user_response)!=None):
                     print("ROBO: "+greeting(user_response))
