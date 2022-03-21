@@ -61,7 +61,7 @@ GREETING_RESPONSES = ["hi", "hey", "*nods*", "hi there", "hello", "I am glad! Yo
 
 
 logs = []
-trackers = []
+story_changes = []
 
 all_slots = {
     'account':None,
@@ -86,6 +86,7 @@ slot_map_for_ban = {
     'success':'সফল',
     'phoneNumber':'ফোন নাম্বার'   
 }
+action_yesno = {{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':None}}
 
 STORIES = {                          ##utter                      action
     # 'check_balance': {'0':'utter_ask_account','1':{'inform':[{'account':76534721}]},'2':'utter_tell_account','3':{''},'3':'utter_ask_pin','3':{'inform':[{'pin':3276}]},'4':'utter_tell_balance'},
@@ -121,7 +122,9 @@ STORIES = {                          ##utter                      action
 def set_slots(slot_name,user_input,user_intent):
     # global all_slots
     # all_slots = nlu_engine.parse(user_input)
+
     ###TODO process user input and extract slots
+
     if user_intent=="affirm":
         all_slots['yesno']=True
     elif user_intent=="deny":
@@ -142,12 +145,14 @@ def utters_responses(to_do=None,slot_name=None):
             all_slots['cursor']+=1
         else:
             print("দয়া করে "+slot_map_for_ban[slot_name]+" দিন")
+            
     elif(to_do=='confirm'):
         if slot_name =='isContinue':
            print("আপনি কি আগের কাজটি সম্পন্ন করতে চান?")
         else:    
             print("আপনার "+slot_map_for_ban[slot_name]+" হল "+str(all_slots[slot_name]))
             print("এটা কি সঠিক হয়েছে?")
+
     elif(to_do=='tell'):
         if slot_name == 'wait':
             print("অনুগ্রহ করে কিছুক্ষণ সময় দিন")
@@ -184,7 +189,7 @@ def action_process(full_action):
 
     if user_intent not in expected_intents:
         this_story =copy.copy(current_story)
-        trackers.append(this_story)
+        story_changes.append(this_story)
         all_slots['cursor']=0
         run_story(user_intent)
 
@@ -240,6 +245,21 @@ def take_input():
     user_intent = response(user_response)
     return user_response,user_intent
 
+def dailouge_process(value):
+    if value['name'].split('_')[0] == 'utter':
+        utter_process(value['name'])   
+        # if 'expected_intents' in value and user_intent in value['expected_intents']:
+        # if value['name'].split('_')[0] == 'action':
+    else:
+        action_process(value)
+
+def slot_reset():
+    all_slots['cursor'] = 0
+    all_slots['success'] = False
+    all_slots['yesno'] = False
+    all_slots['phoneNumber'] = None
+    all_slots['amount'] = None
+    all_slots['phoneNumber'] = None
 
 
 def run_story(user_intent):
@@ -251,34 +271,21 @@ def run_story(user_intent):
         value = this_story[str(all_slots['cursor'])]
         current_story['story_steps'] = all_slots['cursor']-1
         if 'end_story' in value:
-            if trackers != []:
-                story = trackers.pop()
+            dailouge_process(value)
+            if story_changes != []:
+                story = story_changes.pop()
                 utter_process('utter_confirm_isContinue')
-                action_process({'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno']})
+                action_process(action_yesno)
                 if all_slots['yesno']==True:
                     all_slots['cursor']=story['story_steps']
                     # print(all_slots['cursor'])
                     run_story(story['story_name'])
             else:
                 # reset slots
-                all_slots['cursor'] = 0
-                all_slots['success'] = False
-                all_slots['yesno'] = False
-                all_slots['phoneNumber'] = None
-                all_slots['amount'] = None
-                all_slots['phoneNumber'] = None
+                slot_reset()
                 break
-        if value['name'].split('_')[0] == 'utter':
-            utter_process(value['name'])   
-        # if 'expected_intents' in value and user_intent in value['expected_intents']:
-        # if value['name'].split('_')[0] == 'action':
-        else:
-            action_process(value)
-
+        dailouge_process(value)
         
-        
-            
-
 
 current_story = {'story_name':None,'story_steps':None}
 
@@ -292,8 +299,10 @@ def alt_rasa():
             if(user_response=='thanks' or user_response=='thank you' ):
                 flag=False
                 print("ROBO: You are welcome..")
+
             if user_intent in STORIES:                
-                run_story(user_intent)             
+                run_story(user_intent)
+
             else:
                 if(greeting(user_response)!=None):
                     print("ROBO: "+greeting(user_response))
