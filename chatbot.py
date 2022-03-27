@@ -112,10 +112,11 @@ STORIES = {                          ##utter                      action
         '8':{'name':'utter_ask_amountOfMoney'},
         '9':{'name':'action_get_amountOfMoney','expected_intents':['inform','fallback'],'req_slots':['amountOfMoney']},
         '10':{'name':'utter_confirm_amountOfMoney'},
-        '11':{'name':'action_get_yesno','expected_intents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'8'},
+        '11':{'name':'action_get_yesno','expected_int   ents':['affirm','deny'],'req_slots':['yesno'],'prev_step':'8'},
         '12':{'name':'utter_tell_wait'},
         '13':{'name':'utter_tell_success'},
-        '14':{'name':'utter_tell_balance','end_story':True}}
+        '14':{'name':'utter_tell_balance','end_story':True}},
+    
 }
 
 

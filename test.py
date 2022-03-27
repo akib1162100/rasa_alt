@@ -1,3 +1,3 @@
-test_get ={'test 1':1,'test 2':2,'test 3':3}
-print(test_get.get('test 1'))
-print(test_get['test 4'])
+import re
+number_string = re.findall(r'\d{10}',"my account 12341243 number is 1234567890")
+print(number_string)
